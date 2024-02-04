@@ -1,7 +1,17 @@
 let classifyPort;
 let linkRequestPort;
 
-const timer = (ms) => new Promise((res) => setTimeout(res, ms));
+chrome.runtime.onConnect.addListener(async (p) => {
+  if (p.name == "distil-bert-classify-port") {
+    classifyPort = p;
+    classifyPort.onMessage.addListener(onClassifyRequest);
+  }
+  if (p.name == "distil-bert-link-request-port") {
+    linkRequestPort = p;
+    linkRequestPort.onMessage.addListener(onLinkRequestResponse);
+  }
+});
+
 
 const sendFeedback = async (label, text) => {
   const { web_server_url } = await chrome.storage.local.get(["web_server_url"]);
@@ -23,9 +33,11 @@ const sendFeedback = async (label, text) => {
   }
 };
 
+const timer = (ms) => new Promise((res) => setTimeout(res, ms));
+
 const onClassifyRequest = async ({ batch }) => {
   const { web_server_url } = await chrome.storage.local.get(["web_server_url"]);
-
+  
   let query = new URLSearchParams();
 
   batch.forEach((item) => query.append("q", item["text"]));
@@ -69,17 +81,6 @@ const onLinkRequestResponse = async ({ text, label }) => {
   console.log(text, label)
   sendFeedback(label, text);
 };
-
-chrome.runtime.onConnect.addListener(async (p) => {
-  if (p.name == "distil-bert-classify-port") {
-    classifyPort = p;
-    classifyPort.onMessage.addListener(onClassifyRequest);
-  }
-  if (p.name == "distil-bert-link-request-port") {
-    linkRequestPort = p;
-    linkRequestPort.onMessage.addListener(onLinkRequestResponse);
-  }
-});
 
 chrome.contextMenus.create(
   {
