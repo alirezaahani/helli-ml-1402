@@ -1,30 +1,33 @@
 (async () => {
-  const classifyPort = chrome.runtime.connect({
-    name: "distil-bert-classify-port",
+  const backgroundPort = chrome.runtime.connect({
+    name: "distil-bert-port",
   });
-  const linkRequestPort = chrome.runtime.connect({
-    name: "distil-bert-link-request-port",
-  });
-  linkRequestPort.onMessage.addListener(({ url, label }) => {
-    let anchor = Array.from(document.querySelectorAll("a")).filter(
-      (anchor) => anchor.href === url
-    )[0];
-    if (location.href.includes("google.com/search")) {
-      for (let i = 0; i < 5; i++) {
-        anchor = anchor.parentNode;
-      }
-    }
-    linkRequestPort.postMessage({ text: anchor.innerText, label: label });
-  });
+  
+  backgroundPort.onMessage.addListener(({ type, arguments }) => {
+    console.log(type, JSON.stringify(arguments))
 
-  classifyPort.onMessage.addListener((prediction) => {
-    document
-      .querySelectorAll(`a[href='${prediction["url"]}']`)
-      .forEach((link) => {
-        link.style.backgroundColor = `rgba(255, 0, 0, ${
-          prediction["score"] - 0.3
-        })`;
-      });
+    if(type === "link-request") {
+      let anchor = Array.from(document.querySelectorAll("a")).filter(
+        (anchor) => anchor.href === arguments['url']
+      )[0];
+      if (location.href.includes("google.com/search")) {
+        for (let i = 0; i < 5; i++) {
+          anchor = anchor.parentNode;
+        }
+      }
+      backgroundPort.postMessage({ type: 'link-request', arguments: { 
+        text: anchor.innerText, 
+        label: arguments['label'] 
+      }});
+    } else if (type === "classify") {
+      document
+        .querySelectorAll(`a[href='${arguments["url"]}']`)
+        .forEach((link) => {
+          link.style.backgroundColor = `rgba(255, 0, 0, ${
+            arguments["score"] - 0.3
+          })`;
+        });
+    }
   });
   
   const timer = (ms) => new Promise((res) => setTimeout(res, ms));
@@ -90,7 +93,7 @@
   }, []);
 
   for (const batch of batches) {
-    classifyPort.postMessage({ batch: batch });
+    backgroundPort.postMessage({ type: "classify", arguments: { batch: batch } });
     await timer(2000);
   }
 })();
