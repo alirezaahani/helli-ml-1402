@@ -1,20 +1,17 @@
 (async () => {
+  let spam_color = [255, 0, 0];
+
   const backgroundPort = chrome.runtime.connect({
     name: "distil-bert-port",
   });
   
   backgroundPort.onMessage.addListener(({ type, arguments }) => {
-    console.log(type, JSON.stringify(arguments))
-
-    if(type === "link-request") {
+    if (type === 'options') {
+      spam_color = arguments['spam_color'];
+    } else if(type === "link-request") {
       let anchor = Array.from(document.querySelectorAll("a")).filter(
         (anchor) => anchor.href === arguments['url']
       )[0];
-      if (location.href.includes("google.com/search")) {
-        for (let i = 0; i < 5; i++) {
-          anchor = anchor.parentNode;
-        }
-      }
       backgroundPort.postMessage({ type: 'link-request', arguments: { 
         text: anchor.innerText, 
         label: arguments['label'] 
@@ -23,9 +20,20 @@
       document
         .querySelectorAll(`a[href='${arguments["url"]}']`)
         .forEach((link) => {
-          link.style.backgroundColor = `rgba(255, 0, 0, ${
-            arguments["score"] - 0.3
-          })`;
+          link.setAttribute('distilbert-spam', true);
+          link.setAttribute('distilbert-original-color', link.style.backgroundColor);
+          link.style.backgroundColor = `rgba(${spam_color[0]}, ${spam_color[1]}, ${spam_color[2]}, ${arguments["score"] - 0.3})`;
+          link.setAttribute('distilbert-detected-color', link.style.backgroundColor);
+        });
+    } else if (type === "toggle-label") {
+      document
+        .querySelectorAll(`a[distilbert-spam="true"]`)
+        .forEach((link) => {
+          if(link.style.backgroundColor == link.getAttribute('distilbert-detected-color')) {
+            link.style.backgroundColor = link.getAttribute('distilbert-original-color');
+          } else if (link.style.backgroundColor == link.getAttribute('distilbert-original-color')) {
+            link.style.backgroundColor = link.getAttribute('distilbert-detected-color'); 
+          }
         });
     }
   });
@@ -51,24 +59,12 @@
     return anchor.innerText;
   };
 
-  const googleSearchBatches = () => {
-    return Array.from(document.querySelectorAll("#search > div > div > div"))
-      .map((result) => {
-        result.querySelector("a").setAttribute("checked-by-distil-bert", true);
-        return result;
-      })
-      .map((result) => ({
-        url: result.querySelector("a").getAttribute("href"),
-        text: sanitize(extract_text(result)),
-      }));
-  };
-
   const basicBatchs = () => {
     return Array.from(
-      document.querySelectorAll("a:not([checked-by-distil-bert])")
+      document.querySelectorAll("a:not([distilbert-visited])")
     )
       .map((anchor) => {
-        anchor.setAttribute("checked-by-distil-bert", true);
+        anchor.setAttribute("distilbert-visited", true);
         return anchor;
       })
       .filter((anchor) => sanitize(anchor.innerText).split(" ").length >= 3)
@@ -78,13 +74,7 @@
       }));
   };
 
-  let batches = null;
-
-  if (location.href.includes("google.com/search")) {
-    batches = googleSearchBatches();
-  } else {
-    batches = basicBatchs();
-  }
+  let batches = basicBatchs();
 
   batches = batches.reduce((arr, one, i) => {
     const ch = Math.floor(i / 64);

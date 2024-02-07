@@ -1,3 +1,10 @@
+chrome.runtime.onInstalled.addListener(async (details) => {
+  chrome.storage.local.set({
+    web_server_url: "http://127.0.0.1:5000",
+    spam_color: [255, 0, 0],
+  });
+})
+
 let contentPort;
 
 const contentPortResponse = async ({ type, arguments }) => {
@@ -12,6 +19,10 @@ chrome.runtime.onConnect.addListener(async (p) => {
   if (p.name === "distil-bert-port") {
     contentPort = p;
     contentPort.onMessage.addListener(contentPortResponse);
+
+    const { spam_color } = await chrome.storage.local.get(["spam_color"]);
+    console.log(spam_color)
+    contentPort.postMessage({ type: "options", arguments: { spam_color: spam_color } })
   }
 });
 
@@ -83,7 +94,6 @@ const onClassifyRequest = async ({ batch }) => {
 };
 
 const onLinkRequestResponse = async ({ text, label }) => {
-  console.log(text, label)
   sendFeedback(label, text);
 };
 
@@ -123,6 +133,15 @@ chrome.contextMenus.create(
   () => void chrome.runtime.lastError
 );
 
+chrome.contextMenus.create(
+  {
+    id: "toggle-labels",
+    title: "Visual: Toggle spam reports",
+    contexts: ["all"],
+  },
+  () => void chrome.runtime.lastError
+);
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   switch (info.menuItemId) {
     case "report-text-feedback-ham":
@@ -142,6 +161,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         }
       });
       break;
+    case "toggle-labels":
+      contentPort.postMessage({
+        type: "toggle-label",
+        arguments: {}
+      })
     default:
       break;
   }
