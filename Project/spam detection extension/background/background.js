@@ -1,17 +1,19 @@
-let classifyPort;
-let linkRequestPort;
+let contentPort;
+
+const contentPortResponse = async ({ type, arguments }) => {
+  if(type === "classify") {
+    onClassifyRequest(arguments);
+  } else if (type === "link-request") {
+    onLinkRequestResponse(arguments)
+  }
+}
 
 chrome.runtime.onConnect.addListener(async (p) => {
-  if (p.name == "distil-bert-classify-port") {
-    classifyPort = p;
-    classifyPort.onMessage.addListener(onClassifyRequest);
-  }
-  if (p.name == "distil-bert-link-request-port") {
-    linkRequestPort = p;
-    linkRequestPort.onMessage.addListener(onLinkRequestResponse);
+  if (p.name === "distil-bert-port") {
+    contentPort = p;
+    contentPort.onMessage.addListener(contentPortResponse);
   }
 });
-
 
 const sendFeedback = async (label, text) => {
   const { web_server_url } = await chrome.storage.local.get(["web_server_url"]);
@@ -70,9 +72,12 @@ const onClassifyRequest = async ({ batch }) => {
       continue;
     }
 
-    classifyPort.postMessage({
-      url: batch[i]["url"],
-      score: results[i]["score"],
+    contentPort.postMessage({
+      type: "classify",
+      arguments: {
+        url: batch[i]["url"],
+        score: results[i]["score"],
+      }
     });
   }
 };
@@ -129,9 +134,12 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       break;
     case "report-link-feedback-ham":
     case "report-link-feedback-spam":
-      linkRequestPort.postMessage({
-        url: info.linkUrl,
-        label: info.menuItemId.replace("report-link-feedback-", ""),
+      contentPort.postMessage({
+        type: "link-request",
+        arguments: {
+          url: info.linkUrl,
+          label: info.menuItemId.replace("report-link-feedback-", ""),
+        }
       });
       break;
     default:
