@@ -1,4 +1,4 @@
-window.onload = async () => {
+(async () => {
   const classifyPort = chrome.runtime.connect({
     name: "distil-bert-classify-port",
   });
@@ -93,4 +93,4 @@ window.onload = async () => {
     classifyPort.postMessage({ batch: batch });
     await timer(2000);
   }
-};
+})();
