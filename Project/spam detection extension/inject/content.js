@@ -74,16 +74,27 @@
       }));
   };
 
-  let batches = basicBatchs();
+  const classifyLinks = async () => {
+    let batches = basicBatchs();
 
-  batches = batches.reduce((arr, one, i) => {
-    const ch = Math.floor(i / 64);
-    arr[ch] = [].concat(arr[ch] || [], one);
-    return arr;
-  }, []);
+    if (batches === undefined || batches.length == 0) {
+      return;
+    }
 
-  for (const batch of batches) {
-    backgroundPort.postMessage({ type: "classify", arguments: { batch: batch } });
-    await timer(2000);
+    batches = batches.reduce((arr, one, i) => {
+      const ch = Math.floor(i / 64);
+      arr[ch] = [].concat(arr[ch] || [], one);
+      return arr;
+    }, []);
+
+    for (const batch of batches) {
+      backgroundPort.postMessage({ type: "classify", arguments: { batch: batch } });
+      await timer(2000);
+    }
   }
+
+  
+  setInterval(classifyLinks, 2000);
+  await classifyLinks();
+
 })();

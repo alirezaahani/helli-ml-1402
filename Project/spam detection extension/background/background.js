@@ -21,7 +21,6 @@ chrome.runtime.onConnect.addListener(async (p) => {
     contentPort.onMessage.addListener(contentPortResponse);
 
     const { spam_color } = await chrome.storage.local.get(["spam_color"]);
-    console.log(spam_color)
     contentPort.postMessage({ type: "options", arguments: { spam_color: spam_color } })
   }
 });
