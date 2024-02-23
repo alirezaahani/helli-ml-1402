@@ -8,7 +8,7 @@
     "48": "icons/link-48.png"
   },
 
-  "permissions": ["contextMenus", "notifications", "storage"],
+  "permissions": ["contextMenus", "notifications", "storage", "scripting", "activeTab"],
 
   "host_permissions": ["*://*/*"],
 

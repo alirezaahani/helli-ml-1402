@@ -1,6 +1,6 @@
 chrome.runtime.onInstalled.addListener(async (details) => {
   chrome.storage.local.set({
-    web_server_url: "http://127.0.0.1:5000",
+    web_server_url: "http://127.0.0.1:8000",
     spam_color: [255, 0, 0],
   });
 })
@@ -10,8 +10,6 @@ let contentPort;
 const contentPortResponse = async ({ type, arguments }) => {
   if(type === "classify") {
     onClassifyRequest(arguments);
-  } else if (type === "link-request") {
-    onLinkRequestResponse(arguments)
   }
 }
 
@@ -91,10 +89,6 @@ const onClassifyRequest = async ({ batch }) => {
   }
 };
 
-const onLinkRequestResponse = async ({ text, label }) => {
-  sendFeedback(label, text);
-};
-
 chrome.contextMenus.create(
   {
     id: "report-text-feedback-spam",
@@ -140,6 +134,28 @@ chrome.contextMenus.create(
   () => void chrome.runtime.lastError
 );
 
+const toggle_labels = () => {
+  document.querySelectorAll(`a[distilbert-spam="true"]`).forEach((link) => {
+      if(link.style.backgroundColor == link.getAttribute('distilbert-detected-color')) {
+          link.style.backgroundColor = link.getAttribute('distilbert-original-color');
+      } else if (link.style.backgroundColor == link.getAttribute('distilbert-original-color')) {
+          link.style.backgroundColor = link.getAttribute('distilbert-detected-color'); 
+      }
+  });
+} 
+
+const search_for_link = (url) => {
+  let anchor = Array.from(document.querySelectorAll("a")).filter(
+    (anchor) => anchor.href === url
+  )[0];
+
+  for (let i = 0; i < 10 && anchor.innerText == ''; i++) {
+    anchor = anchor.parentElement
+  }
+
+  return anchor.innerText
+}
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   switch (info.menuItemId) {
     case "report-text-feedback-ham":
@@ -151,19 +167,25 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       break;
     case "report-link-feedback-ham":
     case "report-link-feedback-spam":
-      contentPort.postMessage({
-        type: "link-request",
-        arguments: {
-          url: info.linkUrl,
-          label: info.menuItemId.replace("report-link-feedback-", ""),
-        }
-      });
+      chrome.scripting
+        .executeScript({
+          target: { tabId: tab.id },
+          func: search_for_link,
+          args: [info.linkUrl]
+        }).then(results => {
+          sendFeedback(
+            info.menuItemId.replace("report-link-feedback-", ""),
+            results[0]['result']
+          );
+        })
       break;
     case "toggle-labels":
-      contentPort.postMessage({
-        type: "toggle-label",
-        arguments: {}
-      })
+      chrome.scripting
+        .executeScript({
+          target: { tabId : tab.id },
+          func: toggle_labels,
+        })
+        break;
     default:
       break;
   }
