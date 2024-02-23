@@ -12,6 +12,11 @@
       let anchor = Array.from(document.querySelectorAll("a")).filter(
         (anchor) => anchor.href === arguments['url']
       )[0];
+
+      for (let i = 0; i < 10 && anchor.innerText == ''; i++) {
+        anchor = anchor.parentElement
+      }
+      
       backgroundPort.postMessage({ type: 'link-request', arguments: { 
         text: anchor.innerText, 
         label: arguments['label'] 
