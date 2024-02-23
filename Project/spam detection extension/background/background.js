@@ -68,7 +68,6 @@ const onClassifyRequest = async ({ batch }) => {
     }
 
     request = null;
-    await timer(1000);
   }
 
   if (request === null) {

@@ -85,7 +85,6 @@
 
     for (const batch of batches) {
       backgroundPort.postMessage({ type: "classify", arguments: { batch: batch } });
-      await timer(2000);
     }
   }
 
