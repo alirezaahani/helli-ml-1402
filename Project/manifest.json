@@ -1,0 +1,42 @@
+{
+  "description": "Spam detection using DistilBert",
+  "manifest_version": 3,
+  "name": "DistilBERT spam detector",
+  "version": "0.2",
+
+  "icons": {
+    "48": "icons/link-48.png"
+  },
+
+  "permissions": ["contextMenus", "notifications", "storage", "scripting", "activeTab"],
+
+  "host_permissions": ["*://*/*"],
+
+  "options_ui": {
+    "page": "options.html"
+  },
+
+  "action": {
+    "default_icon": "icons/link-48.png",
+    "default_title": "DistilBERT Spam detector",
+    "default_popup": "options.html"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "js": ["./inject/content.js"]
+    }
+  ],
+
+  "background": {
+    "service_worker": "./background/background.js"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/link-48.png"],
+      "matches": ["*://*/*"]
+    }
+  ]
+}
