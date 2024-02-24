@@ -62,7 +62,6 @@
       backgroundPort.postMessage({ type: "classify", arguments: { batch: batch } });
     }
   }
-
   
   setInterval(classifyLinks, 2000);
   await classifyLinks();

@@ -27,20 +27,11 @@ const sendFeedback = async (label, text) => {
   const { web_server_url } = await chrome.storage.local.get(["web_server_url"]);
 
   const query = new URLSearchParams({ text, label });
-  const request = await fetch(`${web_server_url}/feedback?${query}`, {
+  await fetch(`${web_server_url}/feedback?${query}`, {
     headers: new Headers({
       "ngrok-skip-browser-warning": "anyvalue",
     }),
   });
-
-  if (request.ok) {
-    chrome.notifications.create({
-      iconUrl: chrome.runtime.getURL("icons/link-48.png"),
-      type: "basic",
-      title: "DsitilBert feedback",
-      message: `Reported as ${label}`,
-    });
-  }
 };
 
 const timer = (ms) => new Promise((res) => setTimeout(res, ms));
@@ -134,6 +125,24 @@ chrome.contextMenus.create(
   () => void chrome.runtime.lastError
 );
 
+chrome.contextMenus.create(
+  {
+    id: "report-all-feedback-ham",
+    title: "Feedback: Report all links as ham",
+    contexts: ["all"],
+  },
+  () => void chrome.runtime.lastError
+);
+
+chrome.contextMenus.create(
+  {
+    id: "report-all-feedback-spam",
+    title: "Feedback: Report all links as spam",
+    contexts: ["all"],
+  },
+  () => void chrome.runtime.lastError
+);
+
 const toggle_labels = () => {
   document.querySelectorAll(`a[distilbert-spam="true"]`).forEach((link) => {
       if(link.style.backgroundColor == link.getAttribute('distilbert-detected-color')) {
@@ -184,6 +193,23 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         .executeScript({
           target: { tabId : tab.id },
           func: toggle_labels,
+        })
+        break;
+    case "report-all-feedback-spam":
+    case "report-all-feedback-ham":
+      chrome.scripting
+        .executeScript({
+          target: { tabId : tab.id },
+          func: () => Array.from(document.querySelectorAll("a"))
+              .map(anchor => anchor.innerText)
+              .filter(text => text.split(" ").length >= 3)
+              .filter((item, pos, self) => self.indexOf(item) == pos),
+        })
+        .then(results => {
+          results[0]['result']
+          .forEach(text =>
+            sendFeedback(info.menuItemId.replace("report-all-feedback-", ""), text)
+          )
         })
         break;
     default:
