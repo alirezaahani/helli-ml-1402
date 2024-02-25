@@ -1,11 +1,25 @@
+/**
+ * @typedef {import('../types.js').Message} Message
+ * @typedef {import('../types.js').BatchItem} BatchItem
+ * @typedef {import('../types.js').Prediction} Prediction
+ * @typedef {import('../types.js').RGBColor} RGBColor
+ */
+
 (async () => {
+  /** @type {RGBColor} */
   let spam_color = [255, 0, 0];
 
+  /** @type {chrome.runtime.Port} */
   const backgroundPort = chrome.runtime.connect({
     name: "distil-bert-port",
   });
+
   
-  backgroundPort.onMessage.addListener(({ type, arguments }) => {
+  /**
+   * Receives responses from background script, to set options or show the prediction results
+   * @param {Message} response
+   */
+  const contentPortResponse = ({ type, arguments }) => {
     if (type === 'options') {
       spam_color = arguments['spam_color'];
     } else if (type === "classify") {
@@ -18,19 +32,39 @@
           link.setAttribute('distilbert-detected-color', link.style.backgroundColor);
         });
     }
-  });
+  }
+
+  backgroundPort.onMessage.addListener(contentPortResponse);
   
+
+  /**
+   * Sanitize and fix strings before sending to model
+   * @param {string} str
+   * @return {string} 
+   */
   const sanitize = (str) => {
     return str
       .replace(/\s+/g, " ")
       .trim();
   };
 
+
+  /**
+   * function to extract text from an anchor.
+   * @todo Use better text extraction
+   * @param {Element} anchor
+   * @return {string} 
+   */
   const extract_text = (anchor) => {
     return anchor.innerText;
   };
 
-  const basicBatchs = () => {
+  
+  /**
+   * Returns batches from the document, uses the default algorithm and marks visited links to avoid revisiting.
+   * @return {BatchItem[]} 
+   */
+  const basicBatches = () => {
     return Array.from(
       document.querySelectorAll("a:not([distilbert-visited])")
     )
@@ -45,15 +79,20 @@
       }));
   };
 
+
+  /**
+   * Collects and classifies links from the document. 
+   * @async 
+   */
   const classifyLinks = async () => {
-    let batches = basicBatchs();
+    let batches = basicBatches();
 
     if (batches === undefined || batches.length == 0) {
       return;
     }
 
     batches = batches.reduce((arr, one, i) => {
-      const ch = Math.floor(i / 512);
+      const ch = Math.floor(i / 64);
       arr[ch] = [].concat(arr[ch] || [], one);
       return arr;
     }, []);
@@ -65,5 +104,4 @@
   
   setInterval(classifyLinks, 2000);
   await classifyLinks();
-
 })();

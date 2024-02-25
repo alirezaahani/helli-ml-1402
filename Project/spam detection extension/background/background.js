@@ -1,18 +1,34 @@
+/**
+ * @typedef {import('../types.js').Message} Message
+ * @typedef {import('../types.js').BatchItem} BatchItem
+ * @typedef {import('../types.js').Prediction} Prediction
+ */
+
 chrome.runtime.onInstalled.addListener(async (details) => {
   chrome.storage.local.set({
-    web_server_url: "http://127.0.0.1:8000",
+    server_origin: "http://127.0.0.1:8000",
     spam_color: [255, 0, 0],
   });
 })
 
+
+/** @type {chrome.runtime.Port} */
 let contentPort;
 
+/**
+ * Receives responses from content script 
+ * @param {Message} response
+ */
 const contentPortResponse = async ({ type, arguments }) => {
   if(type === "classify") {
-    onClassifyRequest(arguments);
+    onClassifyRequest(arguments['batch']);
   }
 }
 
+/**
+ * Setups initial channel to background script and sends the related options. 
+ * @param {chrome.runtime.Port} p
+ */
 chrome.runtime.onConnect.addListener(async (p) => {
   if (p.name === "distil-bert-port") {
     contentPort = p;
@@ -23,30 +39,49 @@ chrome.runtime.onConnect.addListener(async (p) => {
   }
 });
 
-const sendFeedback = async (label, text) => {
-  const { web_server_url } = await chrome.storage.local.get(["web_server_url"]);
 
+/**
+ * Sends feedback to the server, handles ngrok warning by sending a value with the request.
+ * @param {"ham"|"spam"} label
+ * @param {string} text
+ * @returns {boolean}
+ */
+const sendFeedback = async (label, text) => {
+  /** @type {{server_origin: string}} */
+  const { server_origin } = await chrome.storage.local.get(["server_origin"]);
+
+  /** @type {URLSearchParams} */
   const query = new URLSearchParams({ text, label });
-  await fetch(`${web_server_url}/feedback?${query}`, {
-    headers: new Headers({
-      "ngrok-skip-browser-warning": "anyvalue",
-    }),
-  });
+
+  try {
+    return (await fetch(`${server_origin}/feedback?${query}`, {
+      headers: new Headers({
+        "ngrok-skip-browser-warning": "anyvalue",
+      }),
+    })).ok;
+  } catch (e) {
+    return false;
+  }
 };
 
-const timer = (ms) => new Promise((res) => setTimeout(res, ms));
 
-const onClassifyRequest = async ({ batch }) => {
-  const { web_server_url } = await chrome.storage.local.get(["web_server_url"]);
+/**
+ * Classifies the batch of links send by content script
+ * @param {BatchItem[]} batch
+ */
+const onClassifyRequest = async (batch) => {
+  /** @type {{server_origin: string}} */
+  const { server_origin } = await chrome.storage.local.get(["server_origin"]);
   
   let query = new URLSearchParams();
 
   batch.forEach((item) => query.append("q", item["text"]));
 
+  /** @type {?Response} */
   let request = null;
 
   for (let i = 0; i < 10; i++) {
-    request = await fetch(`${web_server_url}/classify?${query}`, {
+    request = await fetch(`${server_origin}/classify?${query}`, {
       headers: new Headers({
         "ngrok-skip-browser-warning": "anyvalue",
       }),
@@ -63,8 +98,10 @@ const onClassifyRequest = async ({ batch }) => {
     return;
   }
 
-  const results = await request.json();
 
+  /** @type {Prediction[]} */
+  const results = await request.json();
+  
   for (let i = 0; i < results.length; i++) {
     if (results[i]["label"] == "LABEL_0") {
       continue;
@@ -143,6 +180,10 @@ chrome.contextMenus.create(
   () => void chrome.runtime.lastError
 );
 
+
+/**
+ * Toggles the labels set by the content script, injected in the website
+ */
 const toggle_labels = () => {
   document.querySelectorAll(`a[distilbert-spam="true"]`).forEach((link) => {
       if(link.style.backgroundColor == link.getAttribute('distilbert-detected-color')) {
@@ -153,6 +194,12 @@ const toggle_labels = () => {
   });
 } 
 
+
+/**
+ * Searches for a link's text in the DOM
+ * @param {string} url
+ * @return {string} 
+ */
 const search_for_link = (url) => {
   let anchor = Array.from(document.querySelectorAll("a")).filter(
     (anchor) => anchor.href === url
