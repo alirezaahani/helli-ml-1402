@@ -14,9 +14,7 @@
     name: "distil-bert-port",
   });
 
-  
   /**
-   * Receives responses from background script, to set options or show the prediction results
    * @param {Message} response
    */
   const contentPortResponse = ({ type, arguments }) => {
@@ -35,10 +33,8 @@
   }
 
   backgroundPort.onMessage.addListener(contentPortResponse);
-  
 
   /**
-   * Sanitize and fix strings before sending to model
    * @param {string} str
    * @return {string} 
    */
@@ -48,20 +44,16 @@
       .trim();
   };
 
-
   /**
-   * function to extract text from an anchor.
    * @todo Use better text extraction
    * @param {Element} anchor
    * @return {string} 
    */
-  const extract_text = (anchor) => {
+  const extractText = (anchor) => {
     return anchor.innerText;
   };
 
-  
   /**
-   * Returns batches from the document, uses the default algorithm and marks visited links to avoid revisiting.
    * @return {BatchItem[]} 
    */
   const basicBatches = () => {
@@ -75,13 +67,11 @@
       .filter((anchor) => sanitize(anchor.innerText).split(" ").length >= 3)
       .map((anchor) => ({
         url: anchor.getAttribute("href"),
-        text: sanitize(extract_text(anchor)),
+        text: sanitize(extractText(anchor)),
       }));
   };
 
-
   /**
-   * Collects and classifies links from the document. 
    * @async 
    */
   const classifyLinks = async () => {
@@ -101,7 +91,7 @@
       backgroundPort.postMessage({ type: "classify", arguments: { batch: batch } });
     }
   }
-  
+
   setInterval(classifyLinks, 2000);
   await classifyLinks();
 })();

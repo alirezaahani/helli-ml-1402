@@ -51,11 +51,15 @@ async def feedback(request):
 
     return JSONResponse({ 'ok': True })
 
+def test_server(request):
+    return JSONResponse({ 'ok': True })    
+
 app = Starlette(
     debug=True,
     routes=[
         Route("/classify", classify, methods=["GET"]),
         Route("/feedback", feedback, methods=["GET"]),
+        Route("/test", test_server, methods=["GET"])
     ],
 )
 
